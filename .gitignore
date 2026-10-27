@@ -1,0 +1,7 @@
+linux.html
+work/
+work/*
+./work
+
+*.DS_STORE
+*.out

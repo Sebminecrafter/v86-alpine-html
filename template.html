@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>Tiny Linux (v86)</title>
+  <style>
+    body {
+      margin: 0;
+      background: #008080;
+      font: 12px Tahoma, "MS Sans Serif", Arial, sans-serif;
+      color: #000
+    }
+
+    #win,
+    dialog {
+      background: #c0c0c0;
+      border: 2px solid;
+      border-color: #dfdfdf #404040 #404040 #dfdfdf;
+      box-shadow: inset 1px 1px #fff, inset -1px -1px #808080;
+      padding: 3px
+    }
+
+    #win {
+      position: fixed;
+      inset: 6px;
+      display: flex;
+      flex-direction: column
+    }
+
+    .tb {
+      background: #000080;
+      color: #fff;
+      font-weight: bold;
+      padding: 3px 6px;
+      margin-bottom: 3px
+    }
+
+    .bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: center;
+      padding: 3px 2px
+    }
+
+    button,
+    select {
+      font: inherit;
+      background: #c0c0c0;
+      border: 2px solid;
+      border-color: #fff #404040 #404040 #fff;
+      padding: 2px 9px;
+      cursor: default
+    }
+
+    button:active,
+    button.on {
+      border-color: #404040 #fff #fff #404040;
+      padding: 3px 8px 1px 10px
+    }
+
+    input[type=text] {
+      font: inherit;
+      border: 2px solid;
+      border-color: #808080 #fff #fff #808080;
+      background: #fff;
+      padding: 2px;
+      width: 170px
+    }
+
+    hr {
+      width: 2px;
+      height: 20px;
+      border: 0;
+      border-left: 1px solid #808080;
+      border-right: 1px solid #fff;
+      margin: 0 3px
+    }
+
+    #main {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+      gap: 3px;
+      padding: 2px
+    }
+
+    .sunk {
+      border: 2px solid;
+      border-color: #808080 #fff #fff #808080
+    }
+
+    #stage {
+      flex: 1;
+      position: relative;
+      background: #000;
+      min-width: 0
+    }
+
+    #termwrap,
+    #vga {
+      position: absolute;
+      inset: 0;
+      overflow-y: scroll;
+      overflow-x: auto
+    }
+
+    #vga {
+      display: none;
+      overflow: auto
+    }
+
+    #vga>div {
+      white-space: pre;
+      font: 15px/17px "Courier New", monospace;
+      padding: 4px
+    }
+
+    #term {
+      padding: 4px 8px;
+      color: #aaa;
+      font: 15px/17px "Lucida Console", "Courier New", monospace;
+      white-space: pre
+    }
+
+    .r {
+      height: 17px;
+      white-space: pre
+    }
+
+    #side {
+      width: 190px;
+      display: flex;
+      flex-direction: column
+    }
+
+    #list {
+      flex: 1;
+      background: #fff;
+      overflow: auto;
+      padding: 2px;
+      margin-top: 3px
+    }
+
+    .f {
+      display: flex;
+      gap: 4px;
+      padding: 1px 0
+    }
+
+    .f span {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap
+    }
+
+    .f button {
+      padding: 0 5px;
+      font-size: 11px
+    }
+
+    #sb {
+      padding: 2px 4px;
+      margin: 2px;
+      border: 1px solid;
+      border-color: #808080 #fff #fff #808080
+    }
+
+    #drop {
+      position: fixed;
+      inset: 0;
+      display: none;
+      background: rgba(0, 0, 128, .55);
+      color: #fff;
+      font: bold 24px Tahoma;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none
+    }
+
+    body.drag #drop {
+      display: flex
+    }
+
+    dialog {
+      padding: 3px;
+      width: 430px;
+      color: #000
+    }
+
+    dialog::backdrop {
+      background: rgba(0, 0, 0, .3)
+    }
+
+    dialog .c {
+      padding: 8px
+    }
+
+    dialog label {
+      display: block;
+      margin: 6px 0 2px
+    }
+
+    dialog input[type=text] {
+      width: 95%
+    }
+
+    dialog p {
+      margin: 4px 0;
+      color: #404040
+    }
+  </style>
+</head>
+
+<body>
+  <div id="win">
+    <div class="tb">Tiny Linux - v86</div>
+    <div class="bar">
+      <button id="up">Upload files...</button><input type="file" id="file" multiple hidden>
+      <input type="text" id="dlpath" placeholder="/host file to download"><button id="dl">Download</button>
+      <hr><button id="paste">Paste</button><button id="opt">Boot options...</button><button
+        id="restart">Restart</button><button id="full">Fullscreen</button>
+      <hr><button id="t1" class="on">Terminal</button><button id="t2">VGA screen</button>
+    </div>
+    <div id="main">
+      <div id="stage" class="sunk">
+        <div id="termwrap">
+          <div id="term"></div>
+        </div>
+        <div id="vga"></div>
+      </div>
+      <div id="side"><b>/host (shared folder)</b>
+        <div id="list" class="sunk"><small>Drop files anywhere, or use Upload. They show up in /host inside the
+            VM.</small></div>
+      </div>
+    </div>
+    <div id="sb">loading...</div>
+  </div>
+  <div id="drop">Drop files to upload to /host</div>
+  <dialog id="opts">
+    <div class="tb">Boot options</div>
+    <div class="c">
+      <p>Leave everything empty to use the built-in kernel and rootfs. Applied on Boot.</p>
+      <label>Kernel (bzImage)</label><input type="file" id="o_k">
+      <label>Initrd / rootfs (cpio, cpio.gz) - with no kernel chosen, the built-in kernel is used</label><input
+        type="file" id="o_i">
+      <label>Hard disk image (raw)</label><input type="file" id="o_h">
+      <label>CD-ROM image (.iso)</label><input type="file" id="o_c">
+      <label>Kernel command line (remove "quiet" to see boot messages)</label><input type="text" id="o_cmd">
+      <label>RAM</label><select id="o_mem">
+        <option>64</option>
+        <option>128</option>
+        <option>256</option>
+        <option>512</option>
+        <option selected>1024</option>
+        <option>2048</option>
+      </select> MB
+      <p style="text-align:right"><button id="o_ok">Boot</button> <button id="o_def">Built-in defaults</button> <button
+          id="o_x">Cancel</button></p>
+    </div>
+  </dialog>
+
+  <script>/*__LIBV86__*/</script>
+  <script>
+    const ASSETS = { wasm: "/*__WASM__*/", bios: "/*__BIOS__*/", vga: "/*__VGA__*/", kernel: "/*__KERNEL__*/" };
+    const $ = id => document.getElementById(id), status = t => $('sb').textContent = t;
+    const gunzip = async b => new Uint8Array(await new Response(new Blob([Uint8Array.from(atob(b), c => c.charCodeAt(0))]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+    let emu = null, emuReady = false, tab = 'term', wasmBytes, biosBuf, vgaBuf, kernelBuf;
+    const DEF = 'console=tty0 console=ttyS0 tsc=reliable mitigations=off nowatchdog quiet';
+    const cfg = { kernel: null, initrd: null, hda: null, cdrom: null, cmd: DEF, mem: 1024 };
+    const send = s => { if (!emu) return; const b = new TextEncoder().encode(s); emu.serial0_send(Array.from(b, x => String.fromCharCode(x)).join('')) };
+
+    /* ---- minimal ANSI terminal on the serial port ---- */
+    const term = (() => {
+      const el = $('term'), wrap = $('termwrap'), sbEl = document.createElement('div'), scEl = document.createElement('div'); el.append(sbEl, scEl);
+      const PAL = ['#000', '#a00', '#0a0', '#a50', '#00a', '#a0a', '#0aa', '#aaa', '#555', '#f55', '#5f5', '#ff5', '#55f', '#f5f', '#5ff', '#fff'];
+      const col = n => { if (n < 16) return PAL[n]; if (n < 232) { n -= 16; const v = [0, 95, 135, 175, 215, 255]; return `rgb(${v[n / 36 | 0]},${v[(n / 6 | 0) % 6]},${v[n % 6]})` } const g = 8 + 10 * (n - 232); return `rgb(${g},${g},${g})` };
+      let C = 80, R = 24, x = 0, y = 0, wr = 0, top = 0, bot = 23, fg = null, bg = null, fl = 0, app = 0, cur = 1, sv = [0, 0], st = 0, pm = '', g = [], alt = null, dirty = new Set(), buf = [], pend = 0, lastY = 0;
+      const dec = new TextDecoder(), cell = () => ({ c: ' ', f: null, b: bg, l: 0 }), newRow = () => Array.from({ length: C }, cell), esc = s => s === '&' ? '&amp;' : s === '<' ? '&lt;' : s === '>' ? '&gt;' : s;
+      function rowHtml(r, cx) {
+        let h = '', run = '', key = ''; const fl_ = () => { if (run) h += key ? `<span style="${key}">${run}</span>` : run; run = '' };
+        for (let i = 0; i < C; i++) {
+          const c = r[i]; let F = c.f, B = c.b, l = c.l; if (i === cx) l ^= 4; if (l & 4) { const t = F; F = B || '#000'; B = t || '#aaa' }
+          const k = (F ? `color:${F};` : '') + (B ? `background:${B};` : '') + (l & 1 ? 'font-weight:bold;' : '') + (l & 2 ? 'text-decoration:underline;' : '');
+          if (k !== key) { fl_(); key = k } run += esc(c.c)
+        } fl_(); return h || ' '
+      }
+      function mkRows() { scEl.innerHTML = ''; for (let i = 0; i < R; i++) { const d = document.createElement('div'); d.className = 'r'; scEl.append(d); dirty.add(i) } }
+      function reset() { const m = measure(); C = m[0]; R = m[1]; top = 0; bot = R - 1; x = y = 0; wr = 0; fg = bg = null; fl = 0; app = 0; cur = 1; st = 0; alt = null; g = Array.from({ length: R }, newRow); sbEl.innerHTML = ''; mkRows(); render(true) }
+      function measure() {
+        const s = document.createElement('span'); s.textContent = 'X'.repeat(40); el.append(s); const cw = s.getBoundingClientRect().width / 40; s.remove();
+        return [Math.max(20, Math.floor((wrap.clientWidth - 16 - 18) / cw)), Math.max(5, Math.floor((wrap.clientHeight - 8) / 17))]
+      }
+      const near = () => wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - 40, snap = () => { wrap.scrollTop = wrap.scrollHeight };
+      function render(f) {
+        dirty.add(lastY); dirty.add(y);
+        for (const d of dirty) if (g[d] && scEl.children[d]) scEl.children[d].innerHTML = rowHtml(g[d], d === y && cur ? Math.min(x, C - 1) : -1);
+        dirty.clear(); lastY = y; if (f || alt) snap()
+      }
+      const mark = (a, b) => { for (let i = a; i <= b; i++)dirty.add(i) };
+      function up(t, b) { const r = g.splice(t, 1)[0]; if (t === 0 && b === R - 1 && !alt) { const d = document.createElement('div'); d.className = 'r'; d.innerHTML = rowHtml(r, -1); sbEl.append(d); if (sbEl.childElementCount > 3000) sbEl.firstChild.remove() } g.splice(b, 0, newRow()); mark(t, b) }
+      function down(t, b) { g.splice(b, 1); g.splice(t, 0, newRow()); mark(t, b) }
+      const nl = () => { if (y === bot) up(top, bot); else if (y < R - 1) y++ };
+      const clr = (r, a, b) => { for (let i = a; i < b; i++)g[r][i] = cell(); dirty.add(r) };
+      function sgr(p) {
+        for (let i = 0; i < p.length; i++) {
+          const n = p[i];
+          if (n === 0) { fg = bg = null; fl = 0 } else if (n === 1) fl |= 1; else if (n === 4) fl |= 2; else if (n === 7) fl |= 4; else if (n === 22) fl &= ~1; else if (n === 24) fl &= ~2; else if (n === 27) fl &= ~4;
+          else if (n >= 30 && n <= 37) fg = PAL[n - 30]; else if (n >= 90 && n <= 97) fg = PAL[n - 82]; else if (n === 39) fg = null;
+          else if (n >= 40 && n <= 47) bg = PAL[n - 40]; else if (n >= 100 && n <= 107) bg = PAL[n - 92]; else if (n === 49) bg = null;
+          else if (n === 38 || n === 48) { let v; if (p[i + 1] === 5) { v = col(p[i + 2] | 0); i += 2 } else if (p[i + 1] === 2) { v = `rgb(${p[i + 2] | 0},${p[i + 3] | 0},${p[i + 4] | 0})`; i += 4 } if (v) n === 38 ? fg = v : bg = v }
+        }
+      }
+      function csi(f) {
+        const q = pm[0] === '?', p = pm.replace(/^[?>]/, '').split(';').map(s => +s || 0), n = p[0] || 1; wr = 0;
+        switch (f) {
+          case 'A': y = Math.max(0, y - n); break; case 'B': y = Math.min(R - 1, y + n); break; case 'C': x = Math.min(C - 1, x + n); break; case 'D': x = Math.max(0, x - n); break;
+          case 'E': y = Math.min(R - 1, y + n); x = 0; break; case 'F': y = Math.max(0, y - n); x = 0; break; case 'G': x = Math.min(C - 1, n - 1); break; case 'd': y = Math.min(R - 1, n - 1); break;
+          case 'H': case 'f': y = Math.min(R - 1, (p[0] || 1) - 1); x = Math.min(C - 1, (p[1] || 1) - 1); break;
+          case 'J': if (p[0] === 0) { clr(y, x, C); for (let r = y + 1; r < R; r++)clr(r, 0, C) } else if (p[0] === 1) { for (let r = 0; r < y; r++)clr(r, 0, C); clr(y, 0, x + 1) } else { for (let r = 0; r < R; r++)clr(r, 0, C); if (p[0] === 3) sbEl.innerHTML = '' } break;
+          case 'K': p[0] === 0 ? clr(y, x, C) : p[0] === 1 ? clr(y, 0, x + 1) : clr(y, 0, C); break;
+          case 'L': if (y >= top && y <= bot) for (let i = 0; i < n; i++) { g.splice(bot, 1); g.splice(y, 0, newRow()) } mark(y, bot); break;
+          case 'M': if (y >= top && y <= bot) for (let i = 0; i < n; i++) { g.splice(y, 1); g.splice(bot, 0, newRow()) } mark(y, bot); break;
+          case 'P': g[y].splice(x, n); while (g[y].length < C) g[y].push(cell()); dirty.add(y); break;
+          case '@': g[y].splice(x, 0, ...Array.from({ length: n }, cell)); g[y].length = C; dirty.add(y); break;
+          case 'X': clr(y, x, Math.min(C, x + n)); break; case 'S': for (let i = 0; i < n; i++)up(top, bot); break; case 'T': for (let i = 0; i < n; i++)down(top, bot); break;
+          case 'm': sgr(p); break; case 'r': top = Math.max(0, (p[0] || 1) - 1); bot = Math.min(R - 1, (p[1] || R) - 1); x = 0; y = 0; break;
+          case 's': sv = [x, y]; break; case 'u': [x, y] = sv; break;
+          case 'n': if (p[0] === 6) send(`\x1b[${y + 1};${x + 1}R`); break;
+          case 'h': case 'l': if (q) for (const m of p) {
+            const on = f === 'h'; if (m === 25) cur = on; else if (m === 1) app = on;
+            else if (m === 1049 || m === 47 || m === 1047) { if (on && !alt) { alt = { g, x, y, sv }; g = Array.from({ length: R }, newRow); x = y = 0; mark(0, R - 1) } else if (!on && alt) { g = alt.g; x = alt.x; y = alt.y; alt = null; mark(0, R - 1) } }
+          } break
+        }
+      }
+      function put(s) {
+        for (const ch of s) {
+          const o = ch.charCodeAt(0);
+          if (st === 1) {
+            st = 0; if (ch === '[') (st = 2, pm = ''); else if (ch === ']') st = 3; else if (ch === '(' || ch === ')') st = 4; else if (ch === '7') sv = [x, y]; else if (ch === '8') [x, y] = sv;
+            else if (ch === 'M') { y === top ? down(top, bot) : y > 0 && y-- } else if (ch === 'D') nl(); else if (ch === 'E') { x = 0; nl() } else if (ch === 'c') reset(); continue
+          }
+          if (st === 2) { if (o >= 0x30 && o <= 0x3f) pm += ch; else if (o >= 0x20 && o <= 0x2f) { } else { st = 0; csi(ch) } continue }
+          if (st === 3) { if (ch === '\x07') st = 0; else if (ch === '\x1b') st = 1; continue }
+          if (st === 4) { st = 0; continue }
+          if (o < 32) { if (ch === '\x1b') st = 1; else if (ch === '\n' || o === 11 || o === 12) nl(); else if (ch === '\r') { x = 0; wr = 0 } else if (ch === '\b') { x = Math.max(0, x - 1); wr = 0 } else if (ch === '\t') x = Math.min(C - 1, (x >> 3 << 3) + 8); continue }
+          if (wr) { x = 0; nl(); wr = 0 } g[y][x] = { c: ch, f: fg, b: bg, l: fl }; dirty.add(y); if (x < C - 1) x++; else wr = 1
+        }
+      }
+      function flush() { pend = 0; if (!buf.length) return; const f = near(); put(dec.decode(Uint8Array.from(buf), { stream: true })); buf = []; render(f) }
+      return { reset, flush, snap, push(b) { buf.push(b); if (!pend) { pend = 1; requestAnimationFrame(flush) } }, get cols() { return C }, get rows() { return R }, get app() { return app } }
+    })();
+
+    /* ---- keyboard / paste for the terminal tab ---- */
+    const AR = { ArrowUp: 'A', ArrowDown: 'B', ArrowRight: 'C', ArrowLeft: 'D', Home: 'H', End: 'F' }, TL = { Delete: '3', Insert: '2', PageUp: '5', PageDown: '6' }, SP = { Enter: '\r', Backspace: '\x7f', Tab: '\t', Escape: '\x1b' };
+    const typing = e => /INPUT|TEXTAREA|SELECT/.test(e.target.tagName) || $('opts').open;
+    document.addEventListener('keydown', e => {
+      if (tab !== 'term' || !emu || typing(e) || e.metaKey || (e.ctrlKey && e.shiftKey)) return;
+      let s = null, k = e.key;
+      if (e.ctrlKey && !e.altKey) { if (k === 'c' && String(getSelection())) return; if (k === ' ') s = '\0'; else if (k.length === 1) { const c = k.toUpperCase().charCodeAt(0); if (c >= 64 && c <= 95) s = String.fromCharCode(c - 64) } }
+      else if (AR[k]) s = (term.app ? '\x1bO' : '\x1b[') + AR[k]; else if (TL[k]) s = '\x1b[' + TL[k] + '~'; else if (SP[k]) s = SP[k]; else if (k.length === 1) s = (e.altKey ? '\x1b' : '') + k;
+      if (s !== null) { e.preventDefault(); term.snap(); send(s) }
+    });
+    document.addEventListener('paste', e => { if (tab !== 'term' || !emu || typing(e)) return; e.preventDefault(); term.snap(); send(e.clipboardData.getData('text').replace(/\r?\n/g, '\r')) });
+
+    /* ---- tabs / boot ---- */
+    function setTab(t) {
+      tab = t; $('termwrap').style.display = t === 'term' ? '' : 'none'; $('vga').style.display = t === 'vga' ? 'block' : 'none';
+      $('t1').className = t === 'term' ? 'on' : ''; $('t2').className = t === 'vga' ? 'on' : ''; if (emu) emu.keyboard_set_status(t === 'vga')
+    }
+    $('t1').onclick = () => setTab('term'); $('t2').onclick = () => setTab('vga');
+    const uploaded = new Map();
+    async function boot() {
+      if (emu) { try { emu.destroy() } catch (e) { } emu = null }
+      emuReady = false;
+      setTab('term'); term.reset(); uploaded.clear(); renderList(); status('booting...');
+      const rd = async f => ({ buffer: await f.arrayBuffer() }), vga = $('vga'); vga.innerHTML = '<div></div><canvas style="display:none"></canvas>';
+      const custom = cfg.kernel || cfg.initrd || cfg.hda || cfg.cdrom;
+      const o = {
+        wasm_fn: async im => (await WebAssembly.instantiate(wasmBytes, im)).instance.exports, memory_size: cfg.mem * 1048576, vga_memory_size: 4 * 1048576,
+        screen_container: vga, bios: { buffer: biosBuf }, vga_bios: { buffer: vgaBuf }, filesystem: {}, autostart: true, disable_speaker: true
+      };
+      try {
+        if (cfg.kernel) o.bzimage = await rd(cfg.kernel); else if (cfg.initrd || !(cfg.hda || cfg.cdrom)) o.bzimage = { buffer: kernelBuf };
+        if (o.bzimage) { o.cmdline = cfg.cmd + ` tcols=${term.cols} trows=${term.rows}`; if (cfg.initrd) o.initrd = await rd(cfg.initrd) }
+        if (cfg.hda) o.hda = await rd(cfg.hda); if (cfg.cdrom) o.cdrom = await rd(cfg.cdrom);
+      } catch (e) { status('could not read file: ' + e.message); return }
+      emu = new V86(o);
+      emu.add_listener('serial0-output-byte', b => term.push(b));
+      emu.add_listener('emulator-ready', () => { emuReady = true; status('running' + (custom ? ' (custom image - see VGA screen tab)' : '')) });
+      setTab(custom ? 'vga' : 'term');
+    }
+    async function load() {
+      status('unpacking...'); wasmBytes = await gunzip(ASSETS.wasm); biosBuf = (await gunzip(ASSETS.bios)).buffer; vgaBuf = (await gunzip(ASSETS.vga)).buffer;
+      kernelBuf = Uint8Array.from(atob(ASSETS.kernel), c => c.charCodeAt(0)).buffer; boot()
+    }
+
+    /* ---- files ---- */
+    const fmt = n => n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(1) + ' MB';
+    function renderList() {
+      const l = $('list'); if (!uploaded.size) return; l.innerHTML = ''; for (const [n, s] of uploaded) {
+        const d = document.createElement('div'); d.className = 'f';
+        d.innerHTML = '<span></span><small></small><button>v</button>'; d.children[0].textContent = n; d.children[0].title = '/host/' + n; d.children[1].textContent = fmt(s); d.children[2].onclick = () => download(n); l.append(d)
+      }
+    }
+    async function uploadFiles(fs) {
+      if (!emuReady) { status('VM is still starting; try the upload again when it is running'); return }
+      let uploadedCount = 0, failed = [];
+      for (const f of fs) {
+        const n = f.name.replace(/[\/\\]/g, '_');
+        try { const d = new Uint8Array(await f.arrayBuffer()); await emu.create_file(n, d); uploaded.set(n, d.length); uploadedCount++ } catch (e) { failed.push(n + ': ' + e.message) }
+      }
+      renderList(); status(failed.length ? 'uploaded ' + uploadedCount + ' file(s); failed: ' + failed.join(', ') : 'uploaded ' + uploadedCount + ' file(s) to /host')
+    }
+    async function download(p) {
+      if (!emuReady) { status('VM is still starting; try the download again when it is running'); return }
+      if (!p) return; p = p.replace(/^\/?host\//, '').replace(/^\/+/, '');
+      try { const d = await emu.read_file(p), a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([d])); a.download = p.split('/').pop(); a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000) } catch (e) { status('not found in /host: ' + p) }
+    }
+    $('up').onclick = () => $('file').click(); $('file').onchange = e => { uploadFiles([...e.target.files]); e.target.value = '' };
+    $('dl').onclick = () => download($('dlpath').value.trim()); $('dlpath').onkeydown = e => { if (e.key === 'Enter') download(e.target.value.trim()) };
+    $('paste').onclick = async () => {
+      let t = ''; try { t = await navigator.clipboard.readText() } catch (e) { } if (!t) t = prompt('Text to type into the VM:') || '';
+      if (t && emu) { tab === 'term' ? send(t.replace(/\r?\n/g, '\r')) : emu.keyboard_send_text(t) }
+    };
+    $('full').onclick = () => emu && emu.screen_go_fullscreen(); $('restart').onclick = boot;
+    let dep = 0; addEventListener('dragenter', e => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { dep++; document.body.classList.add('drag') } });
+    addEventListener('dragleave', () => { if (--dep <= 0) { dep = 0; document.body.classList.remove('drag') } }); addEventListener('dragover', e => e.preventDefault());
+    addEventListener('drop', e => { e.preventDefault(); dep = 0; document.body.classList.remove('drag'); const f = [...(e.dataTransfer?.files || [])]; if (f.length) uploadFiles(f) });
+
+    /* ---- boot options dialog ---- */
+    $('o_cmd').value = DEF;
+    $('opt').onclick = () => $('opts').showModal(); $('o_x').onclick = () => $('opts').close();
+    $('o_ok').onclick = () => {
+      cfg.kernel = $('o_k').files[0] || null; cfg.initrd = $('o_i').files[0] || null; cfg.hda = $('o_h').files[0] || null; cfg.cdrom = $('o_c').files[0] || null;
+      cfg.cmd = $('o_cmd').value.trim(); cfg.mem = +$('o_mem').value; $('opts').close(); boot()
+    };
+    $('o_def').onclick = () => { for (const i of ['o_k', 'o_i', 'o_h', 'o_c']) $(i).value = ''; $('o_cmd').value = DEF; $('o_mem').value = '128'; $('o_ok').click() };
+    load().catch(e => { status('error: ' + e.message); console.error(e) });
+  </script>
+</body>
+
+</html>

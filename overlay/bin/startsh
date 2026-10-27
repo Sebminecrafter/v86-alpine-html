@@ -1,0 +1,3 @@
+#!/bin/sh
+[ "$(tty)" = /dev/ttyS0 ] && { . /run/termsize; stty cols $C rows $R; }
+exec /bin/sh -l

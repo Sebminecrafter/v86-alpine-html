@@ -1,0 +1,5 @@
+::sysinit:/etc/v86-sysinit
+ttyS0::respawn:/sbin/getty -n -l /bin/startsh -L 115200 ttyS0 linux
+tty1::respawn:/sbin/getty -n -l /bin/startsh 38400 tty1 linux
+::ctrlaltdel:/sbin/reboot
+::shutdown:/bin/umount -a -r

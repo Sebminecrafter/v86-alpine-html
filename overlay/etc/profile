@@ -1,0 +1,9 @@
+export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+export HOME=/root TERM=${TERM:-linux} PAGER=less
+export PS1='\[\e[1;32m\]\h\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]# '
+alias ll='ls -lah'
+cd /host 2>/dev/null
+if [ -z "$MOTD_SHOWN" ]; then export MOTD_SHOWN=1
+  echo "Alpine Linux $(cat /etc/alpine-release) - kernel $(uname -r) on v86"
+  echo "Uploaded files appear in /host. Offline: install with  apk add --allow-untrusted /host/pkg.apk"
+fi

@@ -1,0 +1,15 @@
+#!/bin/sh
+export PATH=/sbin:/bin:/usr/sbin:/usr/bin
+mount -t proc proc /proc
+mount -t sysfs sys /sys
+mount -t devtmpfs dev /dev 2>/dev/null
+mkdir -p /dev/pts /dev/shm /run
+mount -t devpts devpts /dev/pts
+mount -t tmpfs tmpfs /dev/shm
+mount -t tmpfs tmpfs /run
+mount -t tmpfs tmpfs /tmp
+mount -t 9p host9p /host -o trans=virtio,version=9p2000.L,msize=512000,cache=none || echo "WARNING: could not mount shared /host directory" > /dev/console
+hostname alpine
+C=80; R=25
+for a in $(cat /proc/cmdline); do case $a in tcols=*) C=${a#tcols=};; trows=*) R=${a#trows=};; esac; done
+echo "C=$C R=$R" > /run/termsize
