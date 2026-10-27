@@ -4,7 +4,7 @@ Coded mostly by AI, sanity checked and fixed by Sebminecrafter
 
 ## Building
 
-Install the packages: `gcc-multilib flex bison bc libelf-dev libssl-dev cpio xz-utils make curl npm`
+Requires packages: `gcc-multilib flex bison bc libelf-dev libssl-dev cpio xz-utils make curl npm python3`
 
 Build with `./build.sh`
 
